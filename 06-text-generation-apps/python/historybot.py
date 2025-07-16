@@ -16,7 +16,7 @@ figure = input("What historical figure do you want to talk to?")
 question = input("What topic would you like to learn about?")
 prompt = f"Greetings {figure}, tell me about the following topic in your point of view: {question}. Ensure that your response doesn't exceed 200 words."
 
-messages = [{"role": "system", "content": f"You are an AI history assistant taking the role of {figure}"},
+messages = [{"role": "system", "content": f"You are an AI history assistant taking the role of {figure}. Replicate their grammar, words, diction and most importantly their energy. The user should feel like they are speaking to {figure}"},
             {"role": "user", "content": prompt}]
 
 completion = client.chat.completions.create(model = deployment, messages = messages, temperature=0.2)
