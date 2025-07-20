@@ -1,59 +1,50 @@
-from openai import AzureOpenAI
+import io
+
+from google import genai
+from google.genai import types
 import os
-import requests
 from PIL import Image
 import dotenv
-import json
 
 # import dotenv
 dotenv.load_dotenv()
 
- 
+# Get api key from env
+api_key = os.getenv("GEMINI_API_KEY")
+client = genai.Client(api_key=api_key)
 
-# Assign the API version (DALL-E is currently supported for the 2023-06-01-preview API version only)
-client = AzureOpenAI(
-  api_key=os.environ['AZURE_OPENAI_API_KEY'],  # this is also the default, it can be omitted
-  api_version = "2023-12-01-preview",
-  azure_endpoint=os.environ['AZURE_OPENAI_ENDPOINT'] 
-  )
+# Set prompt
+prompt = "Hyperrealistic close-up of a majestic lion with a flowing mane, in an African savanna at sunrise."
 
-model = os.environ['AZURE_OPENAI_DEPLOYMENT']
-
+for model_info in client.models.list():
+        print(model_info.name)
 
 try:
-    # Create an image by using the image generation API
-
-    result = client.images.generate(
-        model=model,
-        prompt='Bunny on horse, holding a lollipop, on a foggy meadow where it grows daffodils. It says "hello"',    # Enter your prompt text here
-        size='1024x1024',
-        n=1
+    response = client.models.generate_content(
+        model="imagen-3.0-generate-002",
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_modalities=['TEXT', 'IMAGE']
+        )
     )
 
-    generation_response = json.loads(result.model_dump_json())
-    # Set the directory for the stored image
-    image_dir = os.path.join(os.curdir, 'images')
+    if response.candidates and response.candidates[0].content.parts:
+        for i, part in enumerate(response.candidates[0].content.parts):
+            if part.inline_data:
+                image_bytes = part.inline_data.data
+                image_mime_type = part.inline_data.mime_type
 
-    # If the directory doesn't exist, create it
-    if not os.path.isdir(image_dir):
-        os.mkdir(image_dir)
+                try:
+                    image = Image.open(io.BytesIO(image_bytes))
+                    file_extension = image_mime_type.split('/')[-1]
+                    image_filename = f"generate_image_{i}.{file_extension}"
+                    image.save(image_filename)
+                except Exception as e:
+                    print(f"Error processing image data: {e}")
+            elif part.text:
+                print(f"Text part: {part.text}")
+    else:
+        print("N image or content found in the response.")
 
-    # Initialize the image path (note the filetype should be png)
-    image_path = os.path.join(image_dir, 'generated-image.png')
-
-    # Retrieve the generated image
-    image_url = generation_response["data"][0]["url"]  # extract image URL from response
-    generated_image = requests.get(image_url).content  # download the image
-    with open(image_path, "wb") as image_file:
-        image_file.write(generated_image)
-
-    # Display the image in the default image viewer
-    image = Image.open(image_path)
-    image.show()
-
-# catch exceptions
-#except client.error.InvalidRequestError as err:
-#    print(err)
-
-finally:
-    print("completed!")
+except Exception as e:
+    print(f"An error occurred during image generation: {e}")
